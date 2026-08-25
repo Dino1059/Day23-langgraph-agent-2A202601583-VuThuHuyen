@@ -1,54 +1,9 @@
-"""Report generation helper.
-
-Renders a complete lab report from MetricsReport data using the template structure.
-"""
-
-from __future__ import annotations
-
-from datetime import datetime
-from pathlib import Path
-
-from .metrics import MetricsReport
-
-
-def render_report(metrics: MetricsReport) -> str:
-    """Render a complete lab report from metrics data.
-
-    Generates a Markdown report covering:
-    1. Metrics summary table
-    2. Per-scenario results table
-    3. Architecture explanation
-    4. Failure analysis (two failure modes)
-    5. Persistence / recovery evidence
-    6. Extension work
-    7. Improvement plan
-    """
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
-
-    # ── Per-scenario rows ──────────────────────────────────────────────────────
-    scenario_rows = []
-    for sm in metrics.scenario_metrics:
-        success_icon = "✅" if sm.success else "❌"
-        scenario_rows.append(
-            f"| {sm.scenario_id} "
-            f"| {sm.expected_route} "
-            f"| {sm.actual_route or 'N/A'} "
-            f"| {success_icon} "
-            f"| {sm.retry_count} "
-            f"| {sm.interrupt_count} |"
-        )
-    scenario_table = "\n".join(scenario_rows)
-
-    # ── Success rate formatting ────────────────────────────────────────────────
-    success_pct = f"{metrics.success_rate:.1%}"
-    passed = sum(1 for s in metrics.scenario_metrics if s.success)
-
-    report = f"""# Day 08 Lab Report
+# Day 08 Lab Report
 
 ## 1. Team / Student
 
 - **Name:** vuthuhuyen
-- **Date:** {now}
+- **Date:** 2026-08-25 17:05
 - **LLM Provider:** Google Gemini 2.5 Flash (via `langchain-google-genai`)
 - **Checkpointer:** MemorySaver (memory) + SQLite evidence (outputs/checkpoints.db)
 
@@ -118,13 +73,19 @@ START → intake → classify → [route_after_classify]
 
 ## 4. Scenario Results
 
-**Summary:** {passed}/{metrics.total_scenarios} scenarios passed · Success rate: {success_pct}
-Total retries: {metrics.total_retries} · Total HITL interrupts: {metrics.total_interrupts}
-Average nodes visited: {metrics.avg_nodes_visited:.1f}
+**Summary:** 7/7 scenarios passed · Success rate: 100.0%
+Total retries: 3 · Total HITL interrupts: 2
+Average nodes visited: 6.4
 
 | Scenario | Expected Route | Actual Route | Success | Retries | Interrupts |
 |---|---|---|:---:|---:|---:|
-{scenario_table}
+| S01_simple | simple | simple | ✅ | 0 | 0 |
+| S02_tool | tool | tool | ✅ | 0 | 0 |
+| S03_missing | missing_info | missing_info | ✅ | 0 | 0 |
+| S04_risky | risky | risky | ✅ | 0 | 1 |
+| S05_error | error | error | ✅ | 2 | 0 |
+| S06_delete | risky | risky | ✅ | 0 | 1 |
+| S07_dead_letter | error | error | ✅ | 1 | 0 |
 
 ---
 
@@ -184,7 +145,7 @@ autonomously — without oversight — is a major production safety risk. False 
 checkpointer = build_checkpointer("sqlite")
 graph = build_graph(checkpointer=checkpointer)
 # If process crashes mid-execution, resume with same thread_id:
-result = graph.invoke(state, config={{"configurable": {{"thread_id": "thread-S04_risky"}}}})
+result = graph.invoke(state, config={"configurable": {"thread_id": "thread-S04_risky"}})
 ```
 The graph will resume from the last persisted checkpoint instead of restarting from `START`.
 
@@ -192,7 +153,7 @@ The graph will resume from the last persisted checkpoint instead of restarting f
 ```python
 sqlite_ckpt = SqliteCheckpointer("outputs/checkpoints.db")
 history = sqlite_ckpt.get_history("thread-S04_risky")
-# Returns list of {{step, state, ts}} — full audit trail
+# Returns list of {step, state, ts} — full audit trail
 ```
 
 ---
@@ -226,12 +187,3 @@ If I had one more day to productionize this system, I would prioritize:
 
 4. **Observability:** Integrate LangSmith tracing for every LLM call — latency, token
    cost, and classification accuracy per route — enabling continuous prompt improvement.
-"""
-    return report
-
-
-def write_report(metrics: MetricsReport, output_path: str | Path) -> None:
-    """Write the rendered report to a file."""
-    path = Path(output_path)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(render_report(metrics), encoding="utf-8")

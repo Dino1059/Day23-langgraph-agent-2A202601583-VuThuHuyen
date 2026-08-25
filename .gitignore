@@ -22,9 +22,13 @@ env/
 .env
 
 # Persistence
+*.db
+*.db-wal
+*.db-shm
 checkpoints.db
 checkpoints.db-wal
 checkpoints.db-shm
+outputs/*.db*
 
 # Testing
 .pytest_cache/

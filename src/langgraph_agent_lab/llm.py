@@ -12,9 +12,33 @@ Usage in nodes:
 from __future__ import annotations
 
 import os
+from pathlib import Path
+from typing import Any
 
 
-def get_llm(model: str | None = None, temperature: float = 0.0):
+def load_env() -> None:
+    """Load environment variables from .env file if present."""
+    try:
+        from dotenv import load_dotenv
+
+        load_dotenv()
+    except ImportError:
+        env_file = Path(".env")
+        if env_file.exists():
+            for line in env_file.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    k, v = line.split("=", 1)
+                    k = k.strip()
+                    v = v.strip().strip("'\"")
+                    if k and k not in os.environ:
+                        os.environ[k] = v
+
+
+load_env()
+
+
+def get_llm(model: str | None = None, temperature: float = 0.0) -> Any:  # noqa: ANN401
     """Create an LLM client from environment configuration.
 
     Checks for API keys in this order:
@@ -24,6 +48,7 @@ def get_llm(model: str | None = None, temperature: float = 0.0):
 
     Override model with the `model` parameter or LLM_MODEL env var.
     """
+    load_env()
     if os.getenv("GEMINI_API_KEY"):
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI

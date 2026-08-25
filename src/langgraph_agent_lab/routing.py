@@ -20,9 +20,18 @@ def route_after_classify(state: AgentState) -> str:
     - "error"        → "retry"
     - unknown/default → "answer"
 
-    Hint: use a dict mapping for clean implementation.
+    Uses a dict mapping for clean, extensible implementation.
     """
-    raise NotImplementedError("TODO(student): implement route mapping after classify")
+    route = state.get("route", "")
+    mapping: dict[str, str] = {
+        "simple": "answer",
+        "tool": "tool",
+        "missing_info": "clarify",
+        "risky": "risky_action",
+        "error": "retry",
+    }
+    # Return mapped node, defaulting to "answer" for any unknown route
+    return mapping.get(route, "answer")
 
 
 def route_after_evaluate(state: AgentState) -> str:
@@ -32,9 +41,12 @@ def route_after_evaluate(state: AgentState) -> str:
     a key LangGraph advantage over linear LCEL chains.
 
     - If evaluation_result == "needs_retry" → "retry"
-    - Otherwise → "answer"
+    - Otherwise (including "success") → "answer"
     """
-    raise NotImplementedError("TODO(student): implement evaluate routing for retry loop")
+    evaluation_result = state.get("evaluation_result", "success")
+    if evaluation_result == "needs_retry":
+        return "retry"
+    return "answer"
 
 
 def route_after_retry(state: AgentState) -> str:
@@ -45,13 +57,27 @@ def route_after_retry(state: AgentState) -> str:
     - If attempt < max_attempts → "tool" (try again)
     - If attempt >= max_attempts → "dead_letter" (give up, escalate)
     """
-    raise NotImplementedError("TODO(student): implement bounded retry routing")
+    attempt = state.get("attempt", 0)
+    max_attempts = state.get("max_attempts", 3)
+    if attempt < max_attempts:
+        return "tool"
+    return "dead_letter"
 
 
 def route_after_approval(state: AgentState) -> str:
     """Route based on human approval decision.
 
-    - If approved → "tool" (proceed with risky action)
-    - If rejected → "clarify" (ask user for alternative)
+    Reads the approval dict (serializable) from state.
+    - If approved is True  → "tool" (proceed with risky action)
+    - If approved is False → "clarify" (ask user for alternative)
     """
-    raise NotImplementedError("TODO(student): implement approval routing")
+    approval = state.get("approval") or {}
+    # Support both dict (serialized) and ApprovalDecision model
+    if isinstance(approval, dict):
+        approved = approval.get("approved", False)
+    else:
+        approved = getattr(approval, "approved", False)
+
+    if approved:
+        return "tool"
+    return "clarify"
